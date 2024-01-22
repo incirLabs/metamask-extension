@@ -4157,6 +4157,7 @@ export default class MetamaskController extends EventEmitter {
       transactionOptions,
       transactionParams,
       userOperationController: this.userOperationController,
+      keyringController: this.keyringController,
     };
   }
 

@@ -1,4 +1,5 @@
 import { InternalAccount } from '@metamask/keyring-api';
+import { KeyringController } from '@metamask/keyring-controller';
 import {
   TransactionController,
   TransactionMeta,
@@ -6,6 +7,12 @@ import {
 } from '@metamask/transaction-controller';
 import {
   AddUserOperationOptions,
+  PrepareUserOperationRequest,
+  PrepareUserOperationResponse,
+  SignUserOperationRequest,
+  SignUserOperationResponse,
+  UpdateUserOperationRequest,
+  UpdateUserOperationResponse,
   UserOperationController,
 } from '@metamask/user-operation-controller';
 import { addHexPrefix } from 'ethereumjs-util';
@@ -20,6 +27,7 @@ type BaseAddTransactionRequest = {
   transactionParams: TransactionParams;
   transactionController: TransactionController;
   userOperationController: UserOperationController;
+  keyringController: KeyringController;
 };
 
 type FinalAddTransactionRequest = BaseAddTransactionRequest & {
@@ -95,7 +103,7 @@ async function addTransactionOrUserOperation(
 ) {
   const { selectedAccount } = request;
 
-  const isSmartContractAccount = selectedAccount.type === 'eip155:eip4337';
+  const isSmartContractAccount = selectedAccount.type === 'eip155:erc4337';
 
   if (isSmartContractAccount) {
     return addUserOperationWithController(request);
@@ -131,10 +139,12 @@ async function addUserOperationWithController(
     transactionOptions,
     transactionParams,
     userOperationController,
+    selectedAccount,
+    keyringController,
   } = request;
 
   const { maxFeePerGas, maxPriorityFeePerGas } = transactionParams;
-  const { origin, requireApproval, type } = transactionOptions as any;
+  const { origin, type } = transactionOptions as any;
 
   const normalisedTransaction: TransactionParams = {
     ...transactionParams,
@@ -148,12 +158,77 @@ async function addUserOperationWithController(
     delete swaps.type;
   }
 
+  let currentUserOp: any;
+
   const options: AddUserOperationOptions = {
     networkClientId,
     origin,
-    requireApproval,
+    requireApproval: true,
     swaps,
     type,
+    smartContractAccount: {
+      prepareUserOperation: async (
+        _request: PrepareUserOperationRequest,
+      ): Promise<PrepareUserOperationResponse> => {
+        console.log(
+          'prepareUserOperation',
+          keyringController,
+          keyringController.prepareUserOperation,
+          keyringController.prepareUserOperation.toString(),
+        );
+
+        const userOp = await keyringController.prepareUserOperation(
+          selectedAccount.address,
+          [
+            {
+              to: _request.to ?? '0x',
+              data: _request.data ?? '0x',
+              value: _request.value ?? '0x',
+            },
+          ],
+        );
+
+        currentUserOp = {
+          ...userOp,
+          gas: userOp.gasLimits,
+          bundler: userOp.bundlerUrl,
+          sender: selectedAccount.address,
+        };
+
+        delete currentUserOp.gasLimits;
+        delete currentUserOp.bundlerUrl;
+
+        return currentUserOp;
+      },
+
+      updateUserOperation: async (
+        _request: UpdateUserOperationRequest,
+      ): Promise<UpdateUserOperationResponse> => {
+        console.log('Patch request', _request);
+
+        return keyringController.patchUserOperation(
+          selectedAccount.address,
+          _request.userOperation,
+        );
+      },
+
+      signUserOperation: async (
+        _request: SignUserOperationRequest,
+      ): Promise<SignUserOperationResponse> => {
+        console.log('Sign request', _request);
+
+        const ret = {
+          signature: await keyringController.signUserOperation(
+            selectedAccount.address,
+            _request.userOperation,
+          ),
+        };
+
+        console.log('sign req user op', ret);
+
+        return ret;
+      },
+    },
   } as any;
 
   const result = await userOperationController.addUserOperationFromTransaction(
