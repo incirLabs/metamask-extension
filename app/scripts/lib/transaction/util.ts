@@ -158,8 +158,6 @@ async function addUserOperationWithController(
     delete swaps.type;
   }
 
-  let currentUserOp: any;
-
   const options: AddUserOperationOptions = {
     networkClientId,
     origin,
@@ -188,17 +186,17 @@ async function addUserOperationWithController(
           ],
         );
 
-        currentUserOp = {
+        const newUserOp: any = {
           ...userOp,
           gas: userOp.gasLimits,
           bundler: userOp.bundlerUrl,
           sender: selectedAccount.address,
         };
 
-        delete currentUserOp.gasLimits;
-        delete currentUserOp.bundlerUrl;
+        delete newUserOp.gasLimits;
+        delete newUserOp.bundlerUrl;
 
-        return currentUserOp;
+        return newUserOp;
       },
 
       updateUserOperation: async (
