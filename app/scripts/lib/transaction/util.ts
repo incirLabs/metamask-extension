@@ -15,7 +15,6 @@ import {
   UpdateUserOperationResponse,
   UserOperationController,
 } from '@metamask/user-operation-controller';
-import { addHexPrefix } from 'ethereumjs-util';
 
 export type AddTransactionOptions = NonNullable<
   Parameters<TransactionController['addTransaction']>[1]
@@ -143,13 +142,12 @@ async function addUserOperationWithController(
     keyringController,
   } = request;
 
-  const { maxFeePerGas, maxPriorityFeePerGas } = transactionParams;
   const { origin, type } = transactionOptions as any;
 
   const normalisedTransaction: TransactionParams = {
     ...transactionParams,
-    maxFeePerGas: addHexPrefix(maxFeePerGas as string),
-    maxPriorityFeePerGas: addHexPrefix(maxPriorityFeePerGas as string),
+    maxFeePerGas: '0x0',
+    maxPriorityFeePerGas: '0x0',
   };
 
   const swaps = transactionOptions?.swaps?.meta;
@@ -168,12 +166,7 @@ async function addUserOperationWithController(
       prepareUserOperation: async (
         _request: PrepareUserOperationRequest,
       ): Promise<PrepareUserOperationResponse> => {
-        console.log(
-          'prepareUserOperation',
-          keyringController,
-          keyringController.prepareUserOperation,
-          keyringController.prepareUserOperation.toString(),
-        );
+        console.log('Prepare request', _request);
 
         const userOp = await keyringController.prepareUserOperation(
           selectedAccount.address,
